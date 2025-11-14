@@ -21,8 +21,11 @@ module.exports = function (config) {
     coverageReporter: {
       dir: require('path').join(__dirname, './coverage'),
       reporters: [
-        { type: 'lcov', subdir: '.' },       // para SonarCloud
-        { type: 'cobertura', subdir: '.', file: 'cobertura.xml' } // para Azure
+        // Reporte para SonarCloud (lcov.info)
+        { type: 'lcov', subdir: '.' },
+
+        // Reporte para Azure DevOps (Code Coverage tab)
+        { type: 'cobertura', subdir: '.', file: 'cobertura.xml' }
       ]
     },
     reporters: ['progress', 'kjhtml'],
