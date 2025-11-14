@@ -186,7 +186,7 @@ stages:
               containers: |
                 $(dockerHubNamespace)/$(apiImageName):$(imageTag)
               appSettings: |
-                APP_ENV=qa
+                -APP_ENV qa
 
           # Deploy WEB QA como contenedor
           - task: AzureWebAppContainer@1
@@ -197,8 +197,8 @@ stages:
               containers: |
                 $(dockerHubNamespace)/$(webImageName):$(imageTag)
               appSettings: |
-                APP_ENV=qa
-                API_BASE_URL=$(apiBaseUrlQA)
+                -APP_ENV qa
+                -API_BASE_URL $(apiBaseUrlQA)
 
           # Smoke tests QA (API + FRONT)
           - script: |
@@ -237,7 +237,7 @@ stages:
               containers: |
                 $(dockerHubNamespace)/$(apiImageName):$(imageTag)
               appSettings: |
-                APP_ENV=prod
+                -APP_ENV prod
 
           # Deploy WEB PROD como contenedor
           - task: AzureWebAppContainer@1
@@ -248,8 +248,8 @@ stages:
               containers: |
                 $(dockerHubNamespace)/$(webImageName):$(imageTag)
               appSettings: |
-                APP_ENV=prod
-                API_BASE_URL=$(apiBaseUrlPROD)
+                -APP_ENV prod
+                -API_BASE_URL $(apiBaseUrlPROD)
 
           # Smoke tests PROD (API + FRONT)
           - script: |
