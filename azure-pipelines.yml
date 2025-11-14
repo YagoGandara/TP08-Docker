@@ -15,96 +15,136 @@ variables:
   webQaName:   '$(webAppNameQA)'
   webProdName: '$(webAppNamePROD)'
 
+  # URLs base para smoke tests y env.js (definilas como variables en Azure DevOps)
+  apiBaseUrlQA:   '$(apiBaseUrlQA)'
+  apiBaseUrlPROD: '$(apiBaseUrlPROD)'
+  webBaseUrlQA:   '$(webBaseUrlQA)'
+  webBaseUrlPROD: '$(webBaseUrlPROD)'
+
   # Toggle de pruebas de humo
   runSmokeTests: 'false'   # poné 'true' si querés ejecutarlas
 
 stages:
-# ==================== BUILD ====================
+# ==================== BUILD & ANALYZE ====================
 - stage: Build
-  displayName: Build & Test
+  displayName: Build, Test, Coverage & Sonar
   jobs:
-  - job: frontend
-    displayName: Build Frontend (un solo build)
+  - job: build_and_analyze
+    displayName: Front + Back + Coverage + Sonar
     steps:
     - checkout: self
-    - task: NodeTool@0
-      inputs: { versionSpec: '$(node_version)' }
 
-    #1) Instalar dependencias del front
+    # ---------- Node + Python toolchains ----------
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '$(node_version)'
+
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(python_version)'
+        architecture: 'x64'
+
+    # ---------- SonarCloud: Prepare (usa sonar-project.properties) ----------
+    - task: SonarCloudPrepare@2
+      displayName: 'Prepare SonarCloud analysis'
+      inputs:
+        SonarCloud: 'SONARCLOUD_SERVICE_CONNECTION_NAME'
+        organization: 'SONARCLOUD_ORGANIZATION_KEY'
+        scannerMode: 'Other'
+        configMode: 'file'
+        configFile: 'sonar-project.properties'
+
+    # ---------- FRONTEND: install + lint + unit tests (coverage) ----------
     - script: |
+        set -e
         cd frontend
         npm ci --no-audit --no-fund || npm i --no-audit --no-fund --legacy-peer-deps
-        npm run build -- --configuration=production
-      displayName: 'npm ci & ng build (production)'
+      displayName: 'Frontend - npm ci'
 
-    #2) Correr Tests unitarios de Angular
     - script: |
         set -e
         cd frontend
-        npm test -- --watch=false --browsers=ChromeHeadless
-      displayName: 'Run frontend unit tests'
+        npm run lint
+      displayName: 'Frontend - ng lint'
 
-    #3) Si pasan los test, buildear
     - script: |
         set -e
         cd frontend
-        npm run build -- --configuration=production
-      displayName: 'ng build (production)'
+        npm run test:ci
+      displayName: 'Frontend - unit tests with coverage'
 
-    #4) Empaquetar dist para deploy
+    # ---------- FRONTEND: build prod + package artifact ----------
     - script: |
         set -e
-        cd frontend/dist/tp05-web
-        zip -r "$(Build.ArtifactStagingDirectory)/front.zip" .
-      displayName: 'Zip dist (front)'
+        cd frontend
+        npm run build:prod
+      displayName: 'Frontend - ng build --configuration=production'
 
-    - task: PublishBuildArtifacts@1
+    - task: ArchiveFiles@2
+      displayName: 'Package frontend dist as ZIP'
       inputs:
-        pathToPublish: '$(Build.ArtifactStagingDirectory)/front.zip'
-        artifactName: 'front'
-        publishLocation: 'Container'
+        rootFolderOrFile: 'frontend/dist'
+        includeRootFolder: false
+        archiveFile: '$(Build.ArtifactStagingDirectory)/front.zip'
+        archiveType: 'zip'
 
-  - job: backend
-    displayName: Test & Package Backend (FastAPI)
-    steps:
-    - checkout: self
-    - task: UsePythonVersion@0
-      inputs: { versionSpec: '$(python_version)', architecture: 'x64' }
-
+    # ---------- BACKEND: deps + lint + tests (coverage + integración) ----------
     - script: |
         set -e
+        cd backend
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-      displayName: 'Install deps'
-      workingDirectory: backend
+      displayName: 'Backend - install deps'
 
     - script: |
         set -e
+        cd backend
+        flake8 app
+      displayName: 'Backend - flake8'
+
+    - script: |
+        set -e
+        cd backend
         pytest --junitxml=TEST-backend.xml
-      displayName: 'Run backend unit tests'
-      workingDirectory: backend
+      displayName: 'Backend - pytest (unit + integration + coverage)'
 
     - task: PublishTestResults@2
       displayName: 'Publish backend unit test results'
       inputs:
         testResultsFormat: 'JUnit'
-        testResultsFiles: '$(System.DefaultWorkingDirectory)/backend/TEST-backend.xml'
-        searchFolder: '$(System.DefaultWorkingDirectory)'
+        testResultsFiles: 'backend/TEST-backend.xml'
         failTaskOnFailedTests: true
 
     - task: ArchiveFiles@2
-      displayName: 'Zip backend app'
+      displayName: 'Package backend as ZIP'
       inputs:
         rootFolderOrFile: 'backend'
-        includeRootFolder: false
+        includeRootFolder: true
         archiveFile: '$(Build.ArtifactStagingDirectory)/backend.zip'
         archiveType: 'zip'
 
     - task: PublishBuildArtifacts@1
+      displayName: 'Publish frontend artifact'
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/front.zip'
+        artifactName: 'front'
+        publishLocation: 'Container'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish backend artifact'
       inputs:
         pathToPublish: '$(Build.ArtifactStagingDirectory)/backend.zip'
         artifactName: 'back'
         publishLocation: 'Container'
+
+    # ---------- SonarCloud: Run analysis & publish Quality Gate ----------
+    - task: SonarCloudAnalyze@2
+      displayName: 'Run SonarCloud analysis'
+
+    - task: SonarCloudPublish@2
+      displayName: 'Publish SonarCloud quality gate'
+      inputs:
+        pollingTimeoutSec: '300'
 
 # ==================== DEPLOY QA ====================
 - stage: DeployQA
@@ -114,7 +154,7 @@ stages:
   jobs:
   - deployment: QaDeploy
     displayName: Deploy Front & API to QA
-    environment: 'QA'
+    environment: 'QA'    # usá el Environment de Azure con aprobaciones configuradas
     strategy:
       runOnce:
         deploy:
@@ -130,7 +170,7 @@ stages:
               echo "window.__env = { apiBase: '$(apiBaseUrlQA)' };" > "$(Pipeline.Workspace)/env.qa.js"
             displayName: 'Generate env.js (QA)'
 
-          #Re-empaqueto el front + env.js en un nuevo zip
+          # Re empaqueto el front + env.js QA
           - script: |
               set -e
               mkdir -p "$(Pipeline.Workspace)/front_qa_unpack"
@@ -139,18 +179,18 @@ stages:
               mkdir -p assets
               cp "$(Pipeline.Workspace)/env.qa.js" assets/env.js
               zip -qr "$(Pipeline.Workspace)/front-qa-with-env.zip" .
-            displayName: 'Repackage front with env.js (QA)' 
+            displayName: 'Repackage front with env.js (QA)'
 
-          #Hago un solo Zip Deploy del front con el env.js
+          # Deploy FRONT QA
           - task: AzureWebApp@1
             displayName: 'Deploy FRONT to $(webQaName)'
             inputs:
               azureSubscription: '$(azureConnection)'
               appType: 'webAppLinux'
               appName: '$(webQaName)'
-              package: '$(Pipeline.Workspace)/front-qa-with-env.zip'
-              deploymentMethod: 'zipDeploy'     
+              package: '$(Pipeline.Workspace)/front_qa_unpack/front-qa-with-env.zip'
 
+          # Deploy API QA
           - task: AzureWebApp@1
             displayName: 'Deploy API to $(apiQaName)'
             inputs:
@@ -158,15 +198,16 @@ stages:
               appType: 'webAppLinux'
               appName: '$(apiQaName)'
               package: '$(Pipeline.Workspace)/back/backend.zip'
-              deploymentMethod: 'zipDeploy'
 
+          # Seed QA (opcional)
           - script: |
               set -e
               echo "Seeding QA..."
-              curl -fsS -X POST "$(apiBaseUrlQA)admin/seed" -H "X-Seed-Token: $(seedTokenQA)"
-              echo "Seed QA OK"
-            displayName: 'Seed DB (QA)'
+              curl -X POST "$(apiBaseUrlQA)admin/seed" -H "X-Seed-Token: $(seedTokenQA)"
+            displayName: 'Seed QA DB'
+            condition: and(succeeded(), ne(variables['seedTokenQA'], ''))
 
+          # Smoke tests QA (API + FRONT)
           - script: |
               set -e
               echo "Waiting API to be ready..."
@@ -181,7 +222,7 @@ stages:
             displayName: 'Smoke tests QA'
             condition: and(succeeded(), eq(variables['runSmokeTests'], 'true'))
 
-# ================== DEPLOY PROD (con approval) ==================
+# ==================== DEPLOY PROD ====================
 - stage: DeployPROD
   displayName: Deploy to PROD
   dependsOn: DeployQA
@@ -189,7 +230,7 @@ stages:
   jobs:
   - deployment: ProdDeploy
     displayName: Deploy Front & API to PROD
-    environment: 'PROD'
+    environment: 'PROD'   # acá configurás aprobación manual
     strategy:
       runOnce:
         deploy:
@@ -199,13 +240,13 @@ stages:
           - download: current
             artifact: back
 
-          #Genero env.js para PROD
+          # Genero env.js PROD
           - script: |
               set -e
               echo "window.__env = { apiBase: '$(apiBaseUrlPROD)' };" > "$(Pipeline.Workspace)/env.prod.js"
             displayName: 'Generate env.js (PROD)'
 
-          #Re empaqueto el front + env.js PROD  
+          # Re empaqueto el front + env.js PROD
           - script: |
               set -e
               mkdir -p "$(Pipeline.Workspace)/front_prod_unpack"
@@ -215,17 +256,17 @@ stages:
               cp "$(Pipeline.Workspace)/env.prod.js" assets/env.js
               zip -qr "$(Pipeline.Workspace)/front-prod-with-env.zip" .
             displayName: 'Repackage front with env.js (PROD)'
-          
-          # Un solo deploy de FRONT
+
+          # Deploy FRONT PROD
           - task: AzureWebApp@1
             displayName: 'Deploy FRONT to $(webProdName)'
             inputs:
               azureSubscription: '$(azureConnection)'
               appType: 'webAppLinux'
               appName: '$(webProdName)'
-              package: '$(Pipeline.Workspace)/front-prod-with-env.zip'
-              deploymentMethod: 'zipDeploy'
+              package: '$(Pipeline.Workspace)/front_prod_unpack/front-prod-with-env.zip'
 
+          # Deploy API PROD
           - task: AzureWebApp@1
             displayName: 'Deploy API to $(apiProdName)'
             inputs:
@@ -233,16 +274,16 @@ stages:
               appType: 'webAppLinux'
               appName: '$(apiProdName)'
               package: '$(Pipeline.Workspace)/back/backend.zip'
-              deploymentMethod: 'zipDeploy'
 
+          # Seed PROD (opcional)
           - script: |
               set -e
               echo "Seeding PROD..."
-              curl -fsS -X POST "$(apiBaseUrlPROD)admin/seed" -H "X-Seed-Token: $(seedTokenPROD)"
-              echo "Seed PROD OK"
-            displayName: 'Seed DB (PROD)'
+              curl -X POST "$(apiBaseUrlPROD)admin/seed" -H "X-Seed-Token: $(seedTokenPROD)"
+            displayName: 'Seed PROD DB'
+            condition: and(succeeded(), ne(variables['seedTokenPROD'], ''))
 
-            
+          # Smoke tests PROD (API + FRONT)
           - script: |
               set -e
               echo "Waiting API to be ready..."

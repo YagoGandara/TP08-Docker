@@ -74,3 +74,8 @@ backend/htmlcov/
 # Coverage frontend
 frontend/coverage/
 
+
+# Cypress artefacts
+frontend/cypress/videos/
+frontend/cypress/screenshots/
+
