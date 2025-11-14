@@ -98,10 +98,12 @@ stages:
     - task: ArchiveFiles@2
       displayName: 'Package frontend dist as ZIP'
       inputs:
-        rootFolderOrFile: 'frontend/dist'
+        # 👇 Igual que antes: zipeamos el contenido de la app Angular
+        rootFolderOrFile: 'frontend/dist/tp05-web'
         includeRootFolder: false
         archiveFile: '$(Build.ArtifactStagingDirectory)/front.zip'
         archiveType: 'zip'
+
 
     # ---------- BACKEND: deps + lint + tests (coverage + integración) ----------
     - script: |
@@ -134,7 +136,7 @@ stages:
       displayName: 'Package backend as ZIP'
       inputs:
         rootFolderOrFile: 'backend'
-        includeRootFolder: true
+        includeRootFolder: false      
         archiveFile: '$(Build.ArtifactStagingDirectory)/backend.zip'
         archiveType: 'zip'
 
@@ -205,6 +207,7 @@ stages:
               appType: 'webAppLinux'
               appName: '$(webQaName)'
               package: '$(Pipeline.Workspace)/front_qa_unpack/front-qa-with-env.zip'
+              deploymentMethod: 'zipDeploy'
 
           # Deploy API QA
           - task: AzureWebApp@1
@@ -214,14 +217,8 @@ stages:
               appType: 'webAppLinux'
               appName: '$(apiQaName)'
               package: '$(Pipeline.Workspace)/back/backend.zip'
+              deploymentMethod: 'zipDeploy'
 
-          # Seed QA (opcional)
-          - script: |
-              set -e
-              echo "Seeding QA..."
-              curl -X POST "$(apiBaseUrlQA)admin/seed" -H "X-Seed-Token: $(seedTokenQA)"
-            displayName: 'Seed QA DB'
-            condition: and(succeeded(), ne(variables['seedTokenQA'], ''))
 
           # Smoke tests QA (API + FRONT)
           - script: |
@@ -281,6 +278,7 @@ stages:
               appType: 'webAppLinux'
               appName: '$(webProdName)'
               package: '$(Pipeline.Workspace)/front_prod_unpack/front-prod-with-env.zip'
+              deploymentMethod: 'zipDeploy'
 
           # Deploy API PROD
           - task: AzureWebApp@1
@@ -290,14 +288,9 @@ stages:
               appType: 'webAppLinux'
               appName: '$(apiProdName)'
               package: '$(Pipeline.Workspace)/back/backend.zip'
+              deploymentMethod: 'zipDeploy'
 
-          # Seed PROD (opcional)
-          - script: |
-              set -e
-              echo "Seeding PROD..."
-              curl -X POST "$(apiBaseUrlPROD)admin/seed" -H "X-Seed-Token: $(seedTokenPROD)"
-            displayName: 'Seed PROD DB'
-            condition: and(succeeded(), ne(variables['seedTokenPROD'], ''))
+
 
           # Smoke tests PROD (API + FRONT)
           - script: |
