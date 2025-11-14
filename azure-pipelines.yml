@@ -46,7 +46,7 @@ stages:
         SonarCloud: 'SonarCloud'             # nombre de tu Service Connection
         organization: 'chinogandara'         # org de SonarCloud
         scannerMode: 'cli'
-        cliScannerVersion: '6.2.1.4610'     
+        cliScannerVersion: '6.2.1.4610'      # la que ya está usando el log
         configMode: 'file'
         configFile: 'sonar-project.properties'
         extraProperties: |
@@ -57,6 +57,9 @@ stages:
           sonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
 
           sonar.exclusions=**/node_modules/**,**/dist/**,frontend/cypress/**,**/*.spec.ts
+
+          sonar.javascript.file.suffixes=.js
+          sonar.typescript.file.suffixes=.ts,.tsx,.cts,.mts
 
     # ---------- SonarCloud: Run analysis & publish Quality Gate ----------
     - task: SonarCloudAnalyze@3
