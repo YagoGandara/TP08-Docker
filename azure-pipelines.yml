@@ -57,7 +57,7 @@ stages:
 
           sonar.javascript.file.suffixes=.js
           sonar.typescript.file.suffixes=.ts,.tsx,.cts,.mts
-          
+
     # ---------- FRONTEND: install + unit tests (coverage) ----------
     - script: |
         set -e
@@ -70,6 +70,14 @@ stages:
         cd frontend
         npm run test:ci
       displayName: 'Frontend - unit tests with coverage'
+
+    - task: PublishCodeCoverageResults@1
+      displayName: 'Publish frontend code coverage'
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: 'frontend/coverage/cobertura.xml'
+        reportDirectory: 'frontend/coverage'
+
 
     - script: |
         set -e
@@ -112,7 +120,10 @@ stages:
     - script: |
         set -e
         cd backend
-        pytest --junitxml=TEST-backend.xml
+        pytest --cov=app \
+               --cov-report=xml:coverage.xml \
+               --cov-report=html \
+               --junitxml=TEST-backend.xml
       displayName: 'Backend - pytest (unit + integration + coverage)'
 
     - task: PublishTestResults@2
@@ -121,6 +132,14 @@ stages:
         testResultsFormat: 'JUnit'
         testResultsFiles: 'backend/TEST-backend.xml'
         failTaskOnFailedTests: true
+
+    - task: PublishCodeCoverageResults@1
+      displayName: 'Publish backend code coverage'
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: 'backend/coverage.xml'
+        reportDirectory: 'backend/htmlcov'
+        failIfCoverageEmpty: true
 
     - task: ArchiveFiles@2
       displayName: 'Package backend as ZIP'

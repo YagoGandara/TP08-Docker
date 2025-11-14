@@ -19,12 +19,11 @@ module.exports = function (config) {
       suppressAll: true,
     },
     coverageReporter: {
-      dir: join(__dirname, './coverage'),
-      subdir: '.',
+      dir: require('path').join(__dirname, './coverage'),
       reporters: [
-        { type: 'html' },
-        { type: 'text-summary' },
-      ],
+        { type: 'lcov', subdir: '.' },       // para SonarCloud
+        { type: 'cobertura', subdir: '.', file: 'cobertura.xml' } // para Azure
+      ]
     },
     reporters: ['progress', 'kjhtml'],
     port: 9876,
