@@ -50,17 +50,12 @@ stages:
         configMode: 'file'
         configFile: 'sonar-project.properties'
         extraProperties: |
-        
-        # Directorio base del proyecto (root del repo)
           sonar.projectBaseDir=$(System.DefaultWorkingDirectory)
 
-          # Cobertura BACKEND (pytest-cov genera backend/coverage.xml)
           sonar.python.coverage.reportPaths=backend/coverage.xml
 
-          # Cobertura FRONTEND (Angular/Jest/Karma -> lcov.info)
           sonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
 
-          # Cosas que NO queremos analizar
           sonar.exclusions=**/node_modules/**,**/dist/**,frontend/cypress/**,**/*.spec.ts
 
     # ---------- SonarCloud: Run analysis & publish Quality Gate ----------
