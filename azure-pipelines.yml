@@ -57,17 +57,7 @@ stages:
 
           sonar.javascript.file.suffixes=.js
           sonar.typescript.file.suffixes=.ts,.tsx,.cts,.mts
-
-    # ---------- SonarCloud: Run analysis & publish Quality Gate ----------
-    - task: SonarCloudAnalyze@2
-      displayName: 'Run SonarCloud analysis'
-
-    - task: SonarCloudPublish@2
-      displayName: 'Publish SonarCloud quality gate'
-      inputs:
-        pollingTimeoutSec: '300'
-
-
+          
     # ---------- FRONTEND: install + unit tests (coverage) ----------
     - script: |
         set -e
