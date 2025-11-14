@@ -15,12 +15,6 @@ variables:
   webQaName:   '$(webAppNameQA)'
   webProdName: '$(webAppNamePROD)'
 
-  # URLs base para smoke tests y env.js (definilas como variables en Azure DevOps)
-  apiBaseUrlQA:   '$(apiBaseUrlQA)'
-  apiBaseUrlPROD: '$(apiBaseUrlPROD)'
-  webBaseUrlQA:   '$(webBaseUrlQA)'
-  webBaseUrlPROD: '$(webBaseUrlPROD)'
-
   # Toggle de pruebas de humo
   runSmokeTests: 'false'   # poné 'true' si querés ejecutarlas
 
@@ -173,7 +167,8 @@ stages:
               unzip -q "$(Pipeline.Workspace)/front/front.zip"
               mkdir -p assets
               cp "$(Pipeline.Workspace)/env.qa.js" assets/env.js
-              zip -qr "$(Pipeline.Workspace)/front-qa-with-env.zip" .
+              # acá el zip se crea en el cwd (front_qa_unpack)
+              zip -qr "front-qa-with-env.zip" .
             displayName: 'Repackage front with env.js (QA)'
 
           # Deploy FRONT QA
@@ -249,7 +244,7 @@ stages:
               unzip -q "$(Pipeline.Workspace)/front/front.zip"
               mkdir -p assets
               cp "$(Pipeline.Workspace)/env.prod.js" assets/env.js
-              zip -qr "$(Pipeline.Workspace)/front-prod-with-env.zip" .
+              zip -qr "front-prod-with-env.zip" .
             displayName: 'Repackage front with env.js (PROD)'
 
           # Deploy FRONT PROD
