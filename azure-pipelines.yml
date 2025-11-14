@@ -39,13 +39,13 @@ stages:
         versionSpec: '$(python_version)'
         architecture: 'x64'
 
-    # ---------- SonarCloud: Prepare (usa sonar-project.properties) ----------
+       # ---------- SonarCloud: Prepare (usa sonar-project.properties) ----------
     - task: SonarCloudPrepare@2
       displayName: 'Prepare SonarCloud analysis'
       inputs:
         SonarCloud: 'SonarCloud'          # service connection
-        organization: 'chinogandara'      # tu org en SonarCloud
-        scannerMode: 'Other'
+        organization: 'chinogandara'
+        scannerMode: 'CLI'
         configMode: 'file'
         configFile: 'sonar-project.properties'
         extraProperties: |
